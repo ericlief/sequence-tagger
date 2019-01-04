@@ -158,8 +158,8 @@ class SequenceTagger:
                     
                     # Use rnn for char emb
                     if args.char_emb_type == "rnn":
-                        cell_fw = tf.contrib.cudnn_rnn.CudnnCompatibleGRUCell(args.rnn_dim)
-                        cell_bw = tf.contrib.cudnn_rnn.CudnnCompatibleGRUCell(args.rnn_dim)
+                        cell_fw = tf.contrib.cudnn_rnn.CudnnCompatibleGRUCell(256)
+                        cell_bw = tf.contrib.cudnn_rnn.CudnnCompatibleGRUCell(256)
                         
                         # Dropout wrapper
                         if args.locked_dropout:
