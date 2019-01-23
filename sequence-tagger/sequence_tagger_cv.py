@@ -990,20 +990,12 @@ class ReduceLROnPlateau:
 class CV:
     
     def __init__(self, args, corpus, lm=None, word_emb=None, k=5):
-        #self.model = model
-        self.corpus = corpus
-        self.lm = lm
-        self.word_emb = word_emb
-        self.k = k # k-fold
         
         # Train with CV
-        self.cv()
-    
-    def cv(self):
-        corpus = self.corpus.train + self.corpus.dev + self.corpus.test  # concat data
-        random.shuffle(corpus)
-        n_sents = len(corpus)
-        sents_per_fold = n_sents // self.k
+        data = corpus.train + corpus.dev + corpus.test  # concat data
+        random.shuffle(data)
+        n_sents = len(data)
+        sents_per_fold = n_sents // k
         indices = [(i, i + sents_per_fold) for i in range(0, n_sents, sents_per_fold)
                    if i + sents_per_fold < n_sents] # indices to split
         print('no sents {}, sents per fold {}'.format(n_sents, sents_per_fold))
@@ -1012,11 +1004,14 @@ class CV:
         self.scores = []  
         iters = 0
         for i, j in indices:
-            model = SequenceTagger(args, self.corpus, lm=self.lm, word_emb=self.word_emb)            	
+            
+            # Construct the tagger
+            print("Constructing tagger i = ", iter)
+            model = SequenceTagger(args, corpus, lm=lm, word_emb=word_emb)            	
             train_data = []
-            train_data.extend(corpus[0:i])
-            train_data.extend(corpus[j:])
-            test_data = corpus[i:j]        
+            train_data.extend(data[0:i])
+            train_data.extend(data[j:])
+            test_data = data[i:j]        
             print("train i=", iters, len(train_data))
             print("test", len(test_data))
             
@@ -1027,7 +1022,6 @@ class CV:
             self.scores.append(model.evaluate(args, test_data, "test_" + str(iters), test_mode=True, embeddings_in_memory=False, metric="f1"))
             
             # Reset
-            #model.scheduler.reset()
             del model
             iters += 1
             
@@ -1150,16 +1144,17 @@ if __name__ == "__main__":
     else:
         lm = None
         
-    # Construct the tagger
-    print("Constructing tagger")
-    tagger = SequenceTagger(args, corpus, lm=lm, word_emb=word_emb)
-    
+   
     #Train
     print("Beginning training") 
     if args.cv:
         CV(args, corpus, lm, word_emb, k=args.cv)
         
     else:
+        
+        # Construct the tagger
+        print("Constructing tagger")
+        tagger = SequenceTagger(args, corpus, lm=lm, word_emb=word_emb)                
         tagger.train(args, corpus.train, checkpoint=True, embeddings_in_memory=False, metric="f1")    
         
         # Test 
