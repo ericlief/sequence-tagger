@@ -1170,8 +1170,8 @@ if __name__ == "__main__":
     filename = os.path.basename(__file__)
     
     # Create logdir name  
-    logdir = "/home/lief/files/tagger/logs/{}-{}-{}".format(    
-    #logdir = "logs/{}-{}-{}".format(
+    #logdir = "/home/lief/files/tagger/logs/{}-{}-{}".format(    
+    logdir = "logs/{}-{}-{}".format(
         filename,
         datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
         ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", key), value) for key, value in sorted(vars(args).items())))
@@ -1187,39 +1187,39 @@ if __name__ == "__main__":
             for line in fin:
                 fout.write(line)        
 
-    # Get the corpus
+    #Get the corpus
     
-    #if args.task == "pos":                                                                                                                   
-        #fh = "data/pos/macmorpho"
-        #cols = {0:"text", 1:"pos"} 
+    if args.task == "pos":                                                                                                                   
+        fh = "data/pos/macmorpho"
+        cols = {0:"text", 1:"pos"} 
                                                                                                    
-    #elif args.task == "ner":
-        #fh = "data/ner/harem" 
-        #cols = {0:"text", 1:"ner"}    
-    
-    #elif args.task == "ner-select":
-        #fh = "data/ner/harem/select" 
-        #cols = {0:"text", 1:"ner"}    
-
-    #elif args.task == "mwe":
-        #fh = "data/pt/mwe" 
-        #cols = {0:"idx", 1:"text", 2:"lemma", 3:"upos", 4:"xpos", 5:"features", 6:"parent", 7:"deprel", 8:"deps", 9:"misc", 10:"mwe"}
-     
-    if args.task == "pos":
-        fh = "/home/lief/tag/data/pos/macmorpho"
-        cols = {0:"text", 1:"pos"}
-  
     elif args.task == "ner":
-        fh = "/home/lief/tag/data/ner/harem"
-        cols = {0:"text", 1:"ner"}
-
+        fh = "data/ner/harem" 
+        cols = {0:"text", 1:"ner"}    
+    
     elif args.task == "ner-select":
-        fh = "/home/lief/tag/data/ner/harem/select"
-        cols = {0:"text", 1:"ner"}
+        fh = "data/ner/harem/select" 
+        cols = {0:"text", 1:"ner"}    
 
     elif args.task == "mwe":
-        fh = "/home/lief/tag/data/pt/mwe"
+        fh = "data/pt/mwe" 
         cols = {0:"idx", 1:"text", 2:"lemma", 3:"upos", 4:"xpos", 5:"features", 6:"parent", 7:"deprel", 8:"deps", 9:"misc", 10:"mwe"}
+     
+    #if args.task == "pos":
+        #fh = "/home/lief/tag/data/pos/macmorpho"
+        #cols = {0:"text", 1:"pos"}
+  
+    #elif args.task == "ner":
+        #fh = "/home/lief/tag/data/ner/harem"
+        #cols = {0:"text", 1:"ner"}
+
+    #elif args.task == "ner-select":
+        #fh = "/home/lief/tag/data/ner/harem/select"
+        #cols = {0:"text", 1:"ner"}
+
+    #elif args.task == "mwe":
+        #fh = "/home/lief/tag/data/pt/mwe"
+        #cols = {0:"idx", 1:"text", 2:"lemma", 3:"upos", 4:"xpos", 5:"features", 6:"parent", 7:"deprel", 8:"deps", 9:"misc", 10:"mwe"}
 
      
     # Fetch corpus
@@ -1232,43 +1232,43 @@ if __name__ == "__main__":
     
     
     
-    #embeddings = []                                                                                                                                                   
-    if args.use_word_emb:
-        #word_emb_flair = WordEmbeddings("pt")                                                                                                                         
-        #word_emb = word_emb_flair.precomputed_word_embeddings # gensim emb                                                                                            
-        word_emb = KeyedVectors.load("/home/lief/files/embeddings/cc.pt.300.kv")
-
-    else:
-        word_emb = None
-
-    # Load Character Language Models (clms)                                                                                                                            
-    if args.use_l_m:
-        # Stack lm embeddings                                                                                                                                          
-        #lm = StackedEmbeddings([FlairEmbeddings("portuguese-forward"), FlairEmbeddings("portuguese-backward")])                                                       
-        fw_lm = FlairEmbeddings("/home/lief/lm/fw/best-lm.pt")
-        bw_lm = FlairEmbeddings("/home/lief/lm/bw/best-lm.pt")
-        lm =  StackedEmbeddings([fw_lm, bw_lm])
-
-
-    else:
-        lm = None
-    
-    
-    
-    ##embeddings = []
+    ##embeddings = []                                                                                                                                                   
     #if args.use_word_emb:
-        #word_emb_flair = WordEmbeddings("pt")
-        #word_emb = word_emb_flair.precomputed_word_embeddings # gensim emb
+        ##word_emb_flair = WordEmbeddings("pt")                                                                                                                         
+        ##word_emb = word_emb_flair.precomputed_word_embeddings # gensim emb                                                                                            
+        #word_emb = KeyedVectors.load("/home/lief/files/embeddings/cc.pt.300.kv")
+
     #else:
         #word_emb = None
-        
-    ## Load Character Language Models (clms)
+
+    ## Load Character Language Models (clms)                                                                                                                            
     #if args.use_l_m:
-        ## Stack lm embeddings
-        #lm = StackedEmbeddings([FlairEmbeddings("portuguese-forward"), FlairEmbeddings("portuguese-backward")])
-    
+        ## Stack lm embeddings                                                                                                                                          
+        ##lm = StackedEmbeddings([FlairEmbeddings("portuguese-forward"), FlairEmbeddings("portuguese-backward")])                                                       
+        #fw_lm = FlairEmbeddings("/home/lief/lm/fw/best-lm.pt")
+        #bw_lm = FlairEmbeddings("/home/lief/lm/bw/best-lm.pt")
+        #lm =  StackedEmbeddings([fw_lm, bw_lm])
+
+
     #else:
         #lm = None
+    
+    
+    
+    #embeddings = []
+    if args.use_word_emb:
+        word_emb_flair = WordEmbeddings("pt")
+        word_emb = word_emb_flair.precomputed_word_embeddings # gensim emb
+    else:
+        word_emb = None
+        
+    # Load Character Language Models (clms)
+    if args.use_l_m:
+        # Stack lm embeddings
+        lm = StackedEmbeddings([FlairEmbeddings("portuguese-forward"), FlairEmbeddings("portuguese-backward")])
+    
+    else:
+        lm = None
         
    
     #Train
