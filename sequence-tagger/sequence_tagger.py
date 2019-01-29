@@ -36,12 +36,13 @@ class SequenceTagger:
          
         # Get words in corpus for in task word embeddings 
         if args.use_words:
-            train_data = corpus.train  
+            #train_data = corpus.train
+            data = corpus.train + corpus.dev + corpus.test
             self.word_dict = {'pad': 0, 'unk': 1}
             self.words = ['pad', 'unk']        
-            for i in range(len(train_data)):
-                for j in range(len(train_data[i])): 
-                    word = train_data[i][j].text
+            for i in range(len(data)):
+                for j in range(len(data[i])): 
+                    word = data[i][j].text
                     if word not in self.word_dict:
                         self.word_dict[word] = len(self.words)
                         self.words.append(word)   
@@ -374,14 +375,21 @@ class SequenceTagger:
 
     def train(self, 
               args,
+              train_data,
+              dataset_name = "train",
               embeddings_in_memory=False,
-              checkpoint=False): 
+              checkpoint=False,
+              train_with_dev=True,
+              metric="accuracy"): 
                     
         # Reset batch metrics
         self.session.run(self.reset_metrics)
         
         # Train epochs
-        train_data = corpus.train  
+        #if cv:
+            #train_data, test_data = self.cv(args.cv)
+        #train_data = corpus.train  
+        
         dev_score = 0
         for epoch in range(args.epochs):
             
@@ -540,25 +548,38 @@ class SequenceTagger:
                 print("Checkpoint saved at ", save_path)
            
             # Save metrics for epoch
-            self.metrics.log_metrics("train", totals, totals_per_tag, epoch, batch_n, self.scheduler.lr, self.scheduler.bad_epochs, dev_score)                
-                    
+            self.metrics.log_metrics(dataset_name, totals, totals_per_tag, epoch, batch_n, self.scheduler.lr, self.scheduler.bad_epochs, dev_score)                
+                   
             # Evaluate with dev data
-            dev_data = corpus.dev                
-            #dev_score = self.evaluate("dev", dev_data, dev_batch_size, epoch, embeddings_in_memory=embeddings_in_memory)
-            dev_score = self.evaluate(args, "dev", dev_data, epoch, embeddings_in_memory=embeddings_in_memory)
-             
-            # Perform one step on lr scheduler
-            is_reduced = self.scheduler.step(dev_score)
-                
+            if train_with_dev:
+                dev_data = corpus.dev                
+                #dev_score = self.evaluate("dev", dev_data, dev_batch_size, epoch, embeddings_in_memory=embeddings_in_memory)
+                score = self.evaluate(args, dev_data, "dev", epoch, embeddings_in_memory=embeddings_in_memory)
+                 
+                # Perform one step on lr scheduler
+                self.scheduler.step(score)
+            
+            else:
+                if metric == "accuracy":
+                    score = self.metrics.accuracy
+                else:
+                    score =  self.metrics.f1
+                    
+                # Perform one step on lr scheduler
+                self.scheduler.step(score)                    
+            
+                    
             #print("Epoch {} batch {}: train loss \t{}\t lr \t{}\t dev score \t{}\t bad epochs \t{}".format(epoch, batch_n, loss, self.lr, dev_score, self.scheduler.bad_epochs))        
             print("Epoch {} batch {}: train loss \t{}\t lr \t{}\t dev score \t{}\t bad epochs \t{}".format(epoch, batch_n, loss, self.scheduler.lr, dev_score, self.scheduler.bad_epochs))        
             
             # Save best model
-            if dev_score == self.scheduler.best:
+            if score == self.scheduler.best:
                 save_path = self.saver.save(self.session, "{}/best-model.ckpt".format(logdir))
                 print("Best model saved at ", save_path) 
+            
+            
 
-    def evaluate(self, args, dataset_name, dataset, epoch=None, test_mode=False, embeddings_in_memory=False, metric="accuracy"):                
+    def evaluate(self, args, dataset, dataset_name, epoch=None, test_mode=False, embeddings_in_memory=False, metric="accuracy"):                
     #def evaluate(self, dataset_name, dataset, eval_batch_size=32, epoch=None, test_mode=False, embeddings_in_memory=False, metric="accuracy"):
                 
         print("Evaluating")
@@ -731,11 +752,11 @@ class SequenceTagger:
         
                         
         # Write test results
+        fh = "{}/tagger_test_".format(logdir) + str(dataset_name) + ".txt"        
         if test_mode:       
-            
             # Write test results for pos or ner
             if args.task != "mwe":
-                with open("{}/tagger_tag_test.txt".format(logdir), "w") as test_file:
+                with open(fh, "w") as test_file:
                     for i in range(len(batches)):
                         for j in range(len(batches[i])): 
                             for k in range(len(batches[i][j])):
@@ -752,11 +773,11 @@ class SequenceTagger:
                                     elif self.tag_type == "pos":
                                         print("{} {} N".format(token.text, gold_tag), file=test_file)
                             print("", file=test_file)
-                return
+                #return
         
             # Write test results for mwe
             else:               
-                with open("{}/tagger_tag_test.txt".format(logdir), "w") as test_file:
+                with open(fh, "w") as test_file:
                     print("# global.columns = ID FORM NO_SPACE PARSEME:MWE", file=test_file)
                     for i in range(len(batches)):
                         for j in range(len(batches[i])): 
@@ -784,7 +805,7 @@ class SequenceTagger:
                                                                      token.text),
                                           file=test_file)
                             print("", file=test_file)
-                return        
+                #return        
         
         # Save and print metrics                  
         self.metrics.print_metrics()
@@ -927,13 +948,11 @@ class ReduceLROnPlateau:
         self.threshold = threshold
         self.threshold_mode = threshold_mode
         self.eps = eps
-        self.bad_epochs = 0
-        self.last_epoch = -1
-        self.best = None
         self.reset()
 
     def reset(self):
         self.bad_epochs = 0
+        self.last_epoch = -1
         self.best = -inf
 
     def step(self, metric, epoch=None):
@@ -967,8 +986,82 @@ class ReduceLROnPlateau:
             return True
         else:
             return False             
+
+
+class CV:
+    
+    def __init__(self, args, corpus, lm=None, word_emb=None, k=5):
         
-       
+        print("Cross validating")
+        
+        #Train with CV
+        data = corpus.train + corpus.dev + corpus.test  # concat data
+        random.shuffle(data)
+        n_sents = len(data)
+        sents_per_fold = n_sents // k
+        indices = [(i, i + sents_per_fold) for i in range(0, n_sents, sents_per_fold)
+                   if i + sents_per_fold < n_sents] # indices to split
+        
+        print("No sents {}, sents per fold {}".format(n_sents, sents_per_fold))
+        print("Indices", indices, len(indices))
+        
+        self.scores = []  
+        iters = 0
+        for i, j in indices:
+            
+            #Construct the tagger
+            print("Constructing tagger, CV iter=", iter)
+            model = SequenceTagger(args, corpus, lm=lm, word_emb=word_emb)            	
+            train_data = []
+            train_data.extend(data[0:i])
+            train_data.extend(data[j:])
+            test_data = data[i:j]        
+            print("Training data size: ", len(train_data))
+            print("Test data size: ", len(test_data))
+            oov_rate(train_data, test_data)  # print OOV rate
+            
+            #Train without dev
+            print("Training, CV iter={}".format(iter))
+            model.train(args, train_data, "train_" + str(iters), checkpoint=True, embeddings_in_memory=True, train_with_dev=False, metric="f1")
+            
+            # Testing
+            print("Testing, CV iter={}".format(iter))
+            self.scores.append(model.evaluate(args, test_data, "test_" + str(iters), test_mode=True, embeddings_in_memory=True, metric="f1"))
+            
+            # Reset
+            del model
+            iters += 1
+        
+        print("CV scores\n", self.scores)
+        
+        @property
+        def scores(self):
+            return self.scores
+        
+        
+def oov_rate(train_data, test_data):
+
+    train_vocab = set([])
+    for i in range(len(train_data)):
+        for j in range(len(train_data[i])):
+            train_vocab.add(train_data[i][j].text)
+
+    print("Train vocab size: ", len(train_vocab))
+
+    test_vocab = set([])
+    for i in range(len(test_data)):
+        for j in range(len(test_data[i])):
+            test_vocab.add(test_data[i][j].text)                
+
+    print("Test vocab size: ", len(test_vocab))
+
+    diff = test_vocab.difference(train_vocab)
+
+    print("Number of OOV words: ", len(diff))
+    rate = len(diff) / len(test_vocab)
+    print("OOV rate " , rate)     
+    
+    
 if __name__ == "__main__":
     import argparse
     import datetime
@@ -1008,9 +1101,9 @@ if __name__ == "__main__":
     parser.add_argument("--dropout_char", default=0, type=float, help="Dropout rate.")
     parser.add_argument("--dropout_sent", default=0, type=float, help="Dropout rate.")    
     parser.add_argument("--dropout_output", default=0, type=float, help="Dropout rate.")        
-    parser.add_argument("--locked_dropout", default=.5, type=float, help="Locked/Variational dropout rate.")
-    parser.add_argument("--word_dropout", default=.05, type=float, help="Word dropout rate.")
-    parser.add_argument("--use_crf", default=0, type=int, help="Conditional random field decoder.")
+    parser.add_argument("--locked_dropout", default=0, type=float, help="Locked/Variational dropout rate.")
+    parser.add_argument("--word_dropout", default=0, type=float, help="Word dropout rate.")
+    parser.add_argument("--use_crf", default=1, type=int, help="Conditional random field decoder.")
     parser.add_argument("--use_pos_tags", default=0, type=int, help="In task PoS tag embeddings.")
     parser.add_argument("--use_words", default=0, type=int, help="In task word embeddings.")    
     parser.add_argument("--use_lemmas", default=0, type=int, help="In task lemma embeddings.")
@@ -1022,13 +1115,14 @@ if __name__ == "__main__":
     parser.add_argument("--annealing_factor", default=.5, type=float, help="LR will decay by this factor")    
     parser.add_argument("--patience", default=20, type=int, help="Patience for lr schedule.")    
     parser.add_argument("--task", default=None, type=str, help="Task.")
+    parser.add_argument("--cv", default=None, type=int, help="Cross Validation.")
     
     args = parser.parse_args()
     filename = os.path.basename(__file__)
     
     # Create logdir name  
-    #logdir = "/home/lief/files/tagger/logs/{}-{}-{}".format(    
-    logdir = "logs/{}-{}-{}".format(
+    logdir = "/home/lief/files/tagger/logs/{}-{}-{}".format(    
+    #ogdir = "logs/{}-{}-{}".format(
         filename,
         datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
         ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", key), value) for key, value in sorted(vars(args).items())))
@@ -1044,23 +1138,41 @@ if __name__ == "__main__":
             for line in fin:
                 fout.write(line)        
 
-    # Get the corpus
+    #Get the corpus
     
-    if args.task == "pos":                                                                                                                   
-        fh = "data/pos/macmorpho"
-        cols = {0:"text", 1:"pos"} 
+    # if args.task == "pos":                                                                                                                   
+    #     fh = "data/pos/macmorpho"
+    #     cols = {0:"text", 1:"pos"} 
                                                                                                    
-    elif args.task == "ner":
-        fh = "data/ner/harem" 
-        cols = {0:"text", 1:"ner"}    
+    # elif args.task == "ner":
+    #     fh = "data/ner/harem" 
+    #     cols = {0:"text", 1:"ner"}    
     
+    # elif args.task == "ner-select":
+    #     fh = "data/ner/harem/select" 
+    #     cols = {0:"text", 1:"ner"}    
+
+    # elif args.task == "mwe":
+    #     fh = "data/pt/mwe" 
+    #     cols = {0:"idx", 1:"text", 2:"lemma", 3:"upos", 4:"xpos", 5:"features", 6:"parent", 7:"deprel", 8:"deps", 9:"misc", 10:"mwe"}
+     
+    if args.task == "pos":
+        fh = "/home/lief/tag/data/pos/macmorpho"
+        cols = {0:"text", 1:"pos"}
+  
+    elif args.task == "ner":
+        fh = "/home/lief/tag/data/ner/harem"
+        cols = {0:"text", 1:"ner"}
+
     elif args.task == "ner-select":
-        fh = "data/ner/harem/select" 
-        cols = {0:"text", 1:"ner"}    
+        fh = "/home/lief/tag/data/ner/harem/select"
+        cols = {0:"text", 1:"ner-select"}
 
     elif args.task == "mwe":
-        fh = "data/pt/mwe" 
+        #fh = "/home/lief/tag/data/mwe"
+        fh = "/home/lief/data/pt/data/mwe"
         cols = {0:"idx", 1:"text", 2:"lemma", 3:"upos", 4:"xpos", 5:"features", 6:"parent", 7:"deprel", 8:"deps", 9:"misc", 10:"mwe"}
+
      
     # Fetch corpus
     print("Getting corpus")
@@ -1070,31 +1182,60 @@ if __name__ == "__main__":
                                                     dev_file="dev.txt", 
                                                     test_file="test.txt")
     
-    #embeddings = []
+    # Print some stats
+    oov_rate(corpus.train, corpus.test)  # print OOV rate
+    
+    
     if args.use_word_emb:
-        word_emb_flair = WordEmbeddings("pt")
-        word_emb = word_emb_flair.precomputed_word_embeddings # gensim emb
+        #word_emb_flair = WordEmbeddings("pt")                                                                               
+        #word_emb = word_emb_flair.precomputed_word_embeddings # gensim emb                    
+        word_emb = KeyedVectors.load("/home/lief/files/embeddings/cc.pt.300.kv")
+
     else:
         word_emb = None
         
-    # Load Character Language Models (clms)
+    #Load Character Language Models (clms)                                                                              
     if args.use_l_m:
-        # Stack lm embeddings
-        lm = StackedEmbeddings([FlairEmbeddings("portuguese-forward"), FlairEmbeddings("portuguese-backward")])
-    
+        #Stack lm embeddings
+        fw_lm = FlairEmbeddings("/home/lief/lm/fw/best-lm.pt")
+        bw_lm = FlairEmbeddings("/home/lief/lm/bw/best-lm.pt")
+        lm =  StackedEmbeddings([fw_lm, bw_lm])
+
+
     else:
         lm = None
-        
-    # Construct the tagger
-    print("Constructing tagger")
-    tagger = SequenceTagger(args, corpus, lm=lm, word_emb=word_emb)
     
+    
+    
+    # #embeddings = []
+    # if args.use_word_emb:
+    #     word_emb_flair = WordEmbeddings("pt")
+    #     word_emb = word_emb_flair.precomputed_word_embeddings # gensim emb
+    # else:
+    #     word_emb = None
+        
+    # # Load Character Language Models (clms)
+    # if args.use_l_m:
+    #     # Stack lm embeddings
+    #     lm = StackedEmbeddings([FlairEmbeddings("portuguese-forward"), FlairEmbeddings("portuguese-backward")])
+    
+    # else:
+    #     lm = None
+        
+   
     #Train
     print("Beginning training") 
-    tagger.train(args, checkpoint=True, embeddings_in_memory=False)   
-     
-    # Test 
-    test_data = corpus.test
-    tagger.evaluate(args, "test",  test_data, test_mode=True, embeddings_in_memory=False)
+    if args.cv:
+        CV(args, corpus, lm, word_emb, k=args.cv)
+        
+    else:
+        
+        # Construct the tagger
+        print("Constructing tagger")
+        tagger = SequenceTagger(args, corpus, lm=lm, word_emb=word_emb)                
+        tagger.train(args, corpus.train, checkpoint=True, embeddings_in_memory=True, metric="accuracy")    
+        
+        # Test 
+        tagger.evaluate(args, corpus.test, "test", test_mode=True, embeddings_in_memory=True, metric="accuracy")
 
      
