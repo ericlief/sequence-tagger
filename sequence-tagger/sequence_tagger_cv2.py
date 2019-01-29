@@ -988,128 +988,128 @@ class ReduceLROnPlateau:
             return False             
 
 
-class CV:
+# class CV:
 
-    def __init__(self, args, corpus, lm=None, word_emb=None, k=5):
+#     def __init__(self, args, corpus, lm=None, word_emb=None, k=5):
 
-        # Train with CV                                                                                                                                                
-        dataset = corpus.train + corpus.dev + corpus.test  # concat data                                                                                               
+#         # Train with CV                                                                                                                                                
+#         dataset = corpus.train + corpus.dev + corpus.test  # concat data                                                                                               
         
-        #print(dataset[0][0].text, dataset[-1][0].text, len(dataset))
+#         #print(dataset[0][0].text, dataset[-1][0].text, len(dataset))
         
-        dataset_split = list()
-        dataset_copy = list(dataset)
-        fold_size = int(len(dataset) / k)
-        for i in range(k):
-            fold = list()
-            while len(fold) < fold_size:
-                index = random.randrange(len(dataset_copy))
-                fold.append(dataset_copy.pop(index))
-                #print(fold)
+#         dataset_split = list()
+#         dataset_copy = list(dataset)
+#         fold_size = int(len(dataset) / k)
+#         for i in range(k):
+#             fold = list()
+#             while len(fold) < fold_size:
+#                 index = random.randrange(len(dataset_copy))
+#                 fold.append(dataset_copy.pop(index))
+#                 #print(fold)
                 
-            dataset_split.append(fold)
+#             dataset_split.append(fold)
             
         
-        print(len(dataset_split), len(dataset_split[0]))
-        #print('data', dataset_split[0][:10])
+#         print(len(dataset_split), len(dataset_split[0]))
+#         #print('data', dataset_split[0][:10])
 
         
 
-        self.scores = []
-        for i in range(len(dataset_split) - 1):
-            train_data = []
-            train_data.extend(dataset_split[:i])
-            train_data.extend(dataset_split[i+1:])
-            train_data = [item for sublist in train_data for item in sublist]
-            test_data = dataset_split[i]
-            # Construct the tagger                                                                                                                                     
-            print("Constructing tagger i = ", i)
-            model = SequenceTagger(args, corpus, lm=lm, word_emb=word_emb)
+#         self.scores = []
+#         for i in range(len(dataset_split) - 1):
+#             train_data = []
+#             train_data.extend(dataset_split[:i])
+#             train_data.extend(dataset_split[i+1:])
+#             train_data = [item for sublist in train_data for item in sublist]
+#             test_data = dataset_split[i]
+#             # Construct the tagger                                                                                                                                     
+#             print("Constructing tagger i = ", i)
+#             model = SequenceTagger(args, corpus, lm=lm, word_emb=word_emb)
 
-            print("train i=", i, len(train_data))
+#             print("train i=", i, len(train_data))
+#             print("test", len(test_data))
+            
+#             #print(train_data[0])
+#             #for i in range(len(train_data)):
+#                 #for j in range(len(train_data[i])):
+#                     #print(train_data[i][j].text)
+            
+            
+            
+#             # Train without dev                                                                                                                                        
+#             model.train(args, train_data, "train_" + str(i), checkpoint=True, embeddings_in_memory=True, train_with_dev=False, metric="f1")
+
+#             # Test                                                                                                                                                     
+#             self.scores.append(model.evaluate(args, test_data, "test_" + str(i), test_mode=True, embeddings_in_memory=True, metric="f1"))
+
+#             # Reset                                                                                                                                                    
+#             del model
+    
+    
+#         #last iter                                                                                                                                                     
+#         i += 1
+#         train_data = []
+#         train_data.extend(dataset_split[:i])
+#         train_data = [item for sublist in train_data for item in sublist]        
+#         test_data = dataset_split[i]
+#         # Construct the tagger                                                                                                                                         
+#         print("Constructing tagger i = ", i)
+#         model = SequenceTagger(args, corpus, lm=lm, word_emb=word_emb)
+
+#         print("train i=", i, len(train_data))
+#         print("test", len(test_data))
+
+#         # Train without dev                                                                                                                                            
+#         model.train(args, train_data, "train_" + str(i), checkpoint=True, embeddings_in_memory=True, train_with_dev=False, metric="f1")
+
+#         # Test                                                                                                                                                                                                                                                                               
+#         self.scores.append(model.evaluate(args, test_data, "test_" + str(i), test_mode=True, embeddings_in_memory=True, metric="f1"))
+    
+#         # Reset                                                                                                                                                        
+#         del model
+                
+                
+#         print("CV scores\n", self.scores)
+
+class CV:
+    
+    def __init__(self, args, corpus, lm=None, word_emb=None, k=5):
+        
+        #Train with CV
+        data = corpus.train + corpus.dev + corpus.test  # concat data
+        random.shuffle(data)
+        n_sents = len(data)
+        sents_per_fold = n_sents // k
+        indices = [(i, i + sents_per_fold) for i in range(0, n_sents, sents_per_fold)
+                   if i + sents_per_fold < n_sents] # indices to split
+        print('no sents {}, sents per fold {}'.format(n_sents, sents_per_fold))
+        print('indices', indices, len(indices))
+        
+        self.scores = []  
+        iters = 0
+        for i, j in indices:
+            
+            #Construct the tagger
+            print("Constructing tagger i = ", iter)
+            model = SequenceTagger(args, corpus, lm=lm, word_emb=word_emb)            	
+            train_data = []
+            train_data.extend(data[0:i])
+            train_data.extend(data[j:])
+            test_data = data[i:j]        
+            print("train i=", iters, len(train_data))
             print("test", len(test_data))
             
-            #print(train_data[0])
-            #for i in range(len(train_data)):
-                #for j in range(len(train_data[i])):
-                    #print(train_data[i][j].text)
-            
-            
-            
-            # Train without dev                                                                                                                                        
-            model.train(args, train_data, "train_" + str(i), checkpoint=True, embeddings_in_memory=True, train_with_dev=False, metric="f1")
-
-            # Test                                                                                                                                                     
-            self.scores.append(model.evaluate(args, test_data, "test_" + str(i), test_mode=True, embeddings_in_memory=True, metric="f1"))
-
-            # Reset                                                                                                                                                    
+            #Train without dev
+            print("Training, iter={}".format(iter))
+            model.train(args, train_data, "train_" + str(iters), checkpoint=True, embeddings_in_memory=True, train_with_dev=False, metric="f1")
+            # Testing
+            print("Testing, iter={}".format(iter))
+            self.scores.append(model.evaluate(args, test_data, "test_" + str(iters), test_mode=True, embeddings_in_memory=True, metric="f1"))
+            # Reset
             del model
-    
-    
-        #last iter                                                                                                                                                     
-        i += 1
-        train_data = []
-        train_data.extend(dataset_split[:i])
-        train_data = [item for sublist in train_data for item in sublist]        
-        test_data = dataset_split[i]
-        # Construct the tagger                                                                                                                                         
-        print("Constructing tagger i = ", i)
-        model = SequenceTagger(args, corpus, lm=lm, word_emb=word_emb)
-
-        print("train i=", i, len(train_data))
-        print("test", len(test_data))
-
-        # Train without dev                                                                                                                                            
-        model.train(args, train_data, "train_" + str(i), checkpoint=True, embeddings_in_memory=True, train_with_dev=False, metric="f1")
-
-        # Test                                                                                                                                                                                                                                                                               
-        self.scores.append(model.evaluate(args, test_data, "test_" + str(i), test_mode=True, embeddings_in_memory=True, metric="f1"))
-    
-        # Reset                                                                                                                                                        
-        del model
-                
-                
+            iters += 1
+            
         print("CV scores\n", self.scores)
-
-#class CV:
-    
-    #def __init__(self, args, corpus, lm=None, word_emb=None, k=5):
-        
-        ## Train with CV
-        #data = corpus.train + corpus.dev + corpus.test  # concat data
-        #random.shuffle(data)
-        #n_sents = len(data)
-        #sents_per_fold = n_sents // k
-        #indices = [(i, i + sents_per_fold) for i in range(0, n_sents, sents_per_fold)
-                   #if i + sents_per_fold < n_sents] # indices to split
-        #print('no sents {}, sents per fold {}'.format(n_sents, sents_per_fold))
-        #print('indices', indices, len(indices))
-        
-        #self.scores = []  
-        #iters = 0
-        #for i, j in indices:
-            
-            ## Construct the tagger
-            #print("Constructing tagger i = ", iter)
-            #model = SequenceTagger(args, corpus, lm=lm, word_emb=word_emb)            	
-            #train_data = []
-            #train_data.extend(data[0:i])
-            #train_data.extend(data[j:])
-            #test_data = data[i:j]        
-            #print("train i=", iters, len(train_data))
-            #print("test", len(test_data))
-            
-            ## Train without dev
-            #model.train(args, train_data, "train_" + str(iters), checkpoint=True, embeddings_in_memory=False, train_with_dev=False, metric="f1")
-            
-            ## Test 
-            #self.scores.append(model.evaluate(args, test_data, "test_" + str(iters), test_mode=True, embeddings_in_memory=False, metric="f1"))
-            
-            ## Reset
-            #del model
-            #iters += 1
-            
-        #print("CV scores\n", self.scores)
        
 if __name__ == "__main__":
     import argparse
@@ -1150,9 +1150,9 @@ if __name__ == "__main__":
     parser.add_argument("--dropout_char", default=0, type=float, help="Dropout rate.")
     parser.add_argument("--dropout_sent", default=0, type=float, help="Dropout rate.")    
     parser.add_argument("--dropout_output", default=0, type=float, help="Dropout rate.")        
-    parser.add_argument("--locked_dropout", default=.5, type=float, help="Locked/Variational dropout rate.")
-    parser.add_argument("--word_dropout", default=.05, type=float, help="Word dropout rate.")
-    parser.add_argument("--use_crf", default=0, type=int, help="Conditional random field decoder.")
+    parser.add_argument("--locked_dropout", default=0, type=float, help="Locked/Variational dropout rate.")
+    parser.add_argument("--word_dropout", default=0, type=float, help="Word dropout rate.")
+    parser.add_argument("--use_crf", default=1, type=int, help="Conditional random field decoder.")
     parser.add_argument("--use_pos_tags", default=0, type=int, help="In task PoS tag embeddings.")
     parser.add_argument("--use_words", default=0, type=int, help="In task word embeddings.")    
     parser.add_argument("--use_lemmas", default=0, type=int, help="In task lemma embeddings.")
@@ -1170,8 +1170,8 @@ if __name__ == "__main__":
     filename = os.path.basename(__file__)
     
     # Create logdir name  
-    #logdir = "/home/lief/files/tagger/logs/{}-{}-{}".format(    
-    logdir = "logs/{}-{}-{}".format(
+    logdir = "/home/lief/files/tagger/logs/{}-{}-{}".format(    
+    #ogdir = "logs/{}-{}-{}".format(
         filename,
         datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
         ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", key), value) for key, value in sorted(vars(args).items())))
@@ -1189,37 +1189,38 @@ if __name__ == "__main__":
 
     #Get the corpus
     
-    if args.task == "pos":                                                                                                                   
-        fh = "data/pos/macmorpho"
-        cols = {0:"text", 1:"pos"} 
+    # if args.task == "pos":                                                                                                                   
+    #     fh = "data/pos/macmorpho"
+    #     cols = {0:"text", 1:"pos"} 
                                                                                                    
-    elif args.task == "ner":
-        fh = "data/ner/harem" 
-        cols = {0:"text", 1:"ner"}    
+    # elif args.task == "ner":
+    #     fh = "data/ner/harem" 
+    #     cols = {0:"text", 1:"ner"}    
     
+    # elif args.task == "ner-select":
+    #     fh = "data/ner/harem/select" 
+    #     cols = {0:"text", 1:"ner"}    
+
+    # elif args.task == "mwe":
+    #     fh = "data/pt/mwe" 
+    #     cols = {0:"idx", 1:"text", 2:"lemma", 3:"upos", 4:"xpos", 5:"features", 6:"parent", 7:"deprel", 8:"deps", 9:"misc", 10:"mwe"}
+     
+    if args.task == "pos":
+        fh = "/home/lief/tag/data/pos/macmorpho"
+        cols = {0:"text", 1:"pos"}
+  
+    elif args.task == "ner":
+        fh = "/home/lief/tag/data/ner/harem"
+        cols = {0:"text", 1:"ner"}
+
     elif args.task == "ner-select":
-        fh = "data/ner/harem/select" 
-        cols = {0:"text", 1:"ner"}    
+        fh = "/home/lief/tag/data/ner/harem/select"
+        cols = {0:"text", 1:"ner-select"}
 
     elif args.task == "mwe":
-        fh = "data/pt/mwe" 
+        #fh = "/home/lief/tag/data/mwe"
+        fh = "/home/lief/data/pt/data/mwe"
         cols = {0:"idx", 1:"text", 2:"lemma", 3:"upos", 4:"xpos", 5:"features", 6:"parent", 7:"deprel", 8:"deps", 9:"misc", 10:"mwe"}
-     
-    #if args.task == "pos":
-        #fh = "/home/lief/tag/data/pos/macmorpho"
-        #cols = {0:"text", 1:"pos"}
-  
-    #elif args.task == "ner":
-        #fh = "/home/lief/tag/data/ner/harem"
-        #cols = {0:"text", 1:"ner"}
-
-    #elif args.task == "ner-select":
-        #fh = "/home/lief/tag/data/ner/harem/select"
-        #cols = {0:"text", 1:"ner"}
-
-    #elif args.task == "mwe":
-        #fh = "/home/lief/tag/data/pt/mwe"
-        #cols = {0:"idx", 1:"text", 2:"lemma", 3:"upos", 4:"xpos", 5:"features", 6:"parent", 7:"deprel", 8:"deps", 9:"misc", 10:"mwe"}
 
      
     # Fetch corpus
@@ -1232,43 +1233,42 @@ if __name__ == "__main__":
     
     
     
-    ##embeddings = []                                                                                                                                                   
-    #if args.use_word_emb:
-        ##word_emb_flair = WordEmbeddings("pt")                                                                                                                         
-        ##word_emb = word_emb_flair.precomputed_word_embeddings # gensim emb                                                                                            
-        #word_emb = KeyedVectors.load("/home/lief/files/embeddings/cc.pt.300.kv")
-
-    #else:
-        #word_emb = None
-
-    ## Load Character Language Models (clms)                                                                                                                            
-    #if args.use_l_m:
-        ## Stack lm embeddings                                                                                                                                          
-        ##lm = StackedEmbeddings([FlairEmbeddings("portuguese-forward"), FlairEmbeddings("portuguese-backward")])                                                       
-        #fw_lm = FlairEmbeddings("/home/lief/lm/fw/best-lm.pt")
-        #bw_lm = FlairEmbeddings("/home/lief/lm/bw/best-lm.pt")
-        #lm =  StackedEmbeddings([fw_lm, bw_lm])
-
-
-    #else:
-        #lm = None
     
-    
-    
-    #embeddings = []
     if args.use_word_emb:
-        word_emb_flair = WordEmbeddings("pt")
-        word_emb = word_emb_flair.precomputed_word_embeddings # gensim emb
+        #word_emb_flair = WordEmbeddings("pt")                                                                               
+        #word_emb = word_emb_flair.precomputed_word_embeddings # gensim emb                    
+        word_emb = KeyedVectors.load("/home/lief/files/embeddings/cc.pt.300.kv")
+
     else:
         word_emb = None
         
-    # Load Character Language Models (clms)
+    #Load Character Language Models (clms)                                                                              
     if args.use_l_m:
-        # Stack lm embeddings
-        lm = StackedEmbeddings([FlairEmbeddings("portuguese-forward"), FlairEmbeddings("portuguese-backward")])
-    
+        #Stack lm embeddings
+        fw_lm = FlairEmbeddings("/home/lief/lm/fw/best-lm.pt")
+        bw_lm = FlairEmbeddings("/home/lief/lm/bw/best-lm.pt")
+        lm =  StackedEmbeddings([fw_lm, bw_lm])
+
+
     else:
         lm = None
+    
+    
+    
+    # #embeddings = []
+    # if args.use_word_emb:
+    #     word_emb_flair = WordEmbeddings("pt")
+    #     word_emb = word_emb_flair.precomputed_word_embeddings # gensim emb
+    # else:
+    #     word_emb = None
+        
+    # # Load Character Language Models (clms)
+    # if args.use_l_m:
+    #     # Stack lm embeddings
+    #     lm = StackedEmbeddings([FlairEmbeddings("portuguese-forward"), FlairEmbeddings("portuguese-backward")])
+    
+    # else:
+    #     lm = None
         
    
     #Train
@@ -1281,10 +1281,10 @@ if __name__ == "__main__":
         # Construct the tagger
         print("Constructing tagger")
         tagger = SequenceTagger(args, corpus, lm=lm, word_emb=word_emb)                
-        tagger.train(args, corpus.train, checkpoint=True, embeddings_in_memory=False, metric="f1")    
+        tagger.train(args, corpus.train, checkpoint=True, embeddings_in_memory=True, metric="accuracy")    
         
         # Test 
         test_data = corpus.test
-        tagger.evaluate(args, test_data, "test", test_mode=True, embeddings_in_memory=False, metric="f1")
+        tagger.evaluate(args, test_data, "test", test_mode=True, embeddings_in_memory=True, metric="accuracy")
 
      
