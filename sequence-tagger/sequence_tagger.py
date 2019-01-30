@@ -1022,11 +1022,11 @@ class CV:
             
             #Train without dev
             print("Training, CV iter={}".format(iter))
-            model.train(args, train_data, "train_" + str(iters), checkpoint=True, embeddings_in_memory=True, train_with_dev=False, metric="f1")
+            model.train(args, train_data, "train_" + str(iters), checkpoint=True, embeddings_in_memory=False, train_with_dev=False, metric="f1")
             
             # Testing
             print("Testing, CV iter={}".format(iter))
-            self.scores.append(model.evaluate(args, test_data, "test_" + str(iters), test_mode=True, embeddings_in_memory=True, metric="f1"))
+            self.scores.append(model.evaluate(args, test_data, "test_" + str(iters), test_mode=True, embeddings_in_memory=False, metric="f1"))
             
             # Reset
             del model
@@ -1170,7 +1170,7 @@ if __name__ == "__main__":
 
     elif args.task == "mwe":
         #fh = "/home/lief/tag/data/mwe"
-        fh = "/home/lief/data/pt/data/mwe"
+        fh = "/home/lief/data/data/mwe"
         cols = {0:"idx", 1:"text", 2:"lemma", 3:"upos", 4:"xpos", 5:"features", 6:"parent", 7:"deprel", 8:"deps", 9:"misc", 10:"mwe"}
 
      
@@ -1233,9 +1233,9 @@ if __name__ == "__main__":
         # Construct the tagger
         print("Constructing tagger")
         tagger = SequenceTagger(args, corpus, lm=lm, word_emb=word_emb)                
-        tagger.train(args, corpus.train, checkpoint=True, embeddings_in_memory=True, metric="accuracy")    
+        tagger.train(args, corpus.train, checkpoint=True, embeddings_in_memory=False, metric="accuracy")    
         
         # Test 
-        tagger.evaluate(args, corpus.test, "test", test_mode=True, embeddings_in_memory=True, metric="accuracy")
+        tagger.evaluate(args, corpus.test, "test", test_mode=True, embeddings_in_memory=False, metric="accuracy")
 
      
